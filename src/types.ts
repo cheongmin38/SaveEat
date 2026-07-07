@@ -73,3 +73,15 @@ export interface AICarbonReportResponse {
   detailedAnalysis: string;
   recommendations: string[];
 }
+
+export interface AICarbonPhotoAnalysis {
+  foodName: string;
+  estimatedWeight: string;
+  carbonFootprintKg: number;
+  carbonLevel: 'HIGH' | 'MEDIUM' | 'LOW';
+  equivalentTrees: number;
+  carbonAnalysis: string;
+  earthSavingTips: string[];
+  recommendedAlternative: string;
+}
+

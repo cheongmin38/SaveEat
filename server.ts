@@ -279,6 +279,194 @@ ${productSummary}
   }
 });
 
+// 4. Real-time Food Image Search Crawler
+app.post("/api/crawl-food-image", async (req, res) => {
+  const { query, category } = req.body;
+  if (!query) {
+    return res.status(400).json({ error: "Query is required" });
+  }
+
+  try {
+    const searchUrl = `https://unsplash.com/s/photos/${encodeURIComponent(query)}`;
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+      // Match image IDs from Unsplash search page
+      const regex = /https:\/\/images\.unsplash\.com\/photo-([a-zA-Z0-9-]+)/g;
+      const matches = Array.from(html.matchAll(regex));
+      
+      if (matches && matches.length > 0) {
+        const uniqueIds = Array.from(new Set(matches.map(m => m[1])));
+        // Index 1 or 2 is usually the first main high-resolution image
+        const selectedId = uniqueIds[1] || uniqueIds[0];
+        const imageUrl = `https://images.unsplash.com/photo-${selectedId}?w=600&auto=format&fit=crop&q=80`;
+        return res.json({ imageUrl, crawled: true });
+      }
+    }
+  } catch (e) {
+    console.warn("Crawl failed, fallback to curated images:", e);
+  }
+
+  // Predefined gorgeous fallbacks based on keyword matching
+  const fallbacks: { keywords: string[]; url: string }[] = [
+    { keywords: ["딸기", "과일", "strawberry", "apple", "fruit"], url: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=600&auto=format&fit=crop&q=80" },
+    { keywords: ["제육", "고기", "pork", "meat", "beef"], url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop&q=80" },
+    { keywords: ["나물", "반찬", "vegetable", "salad"], url: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80" },
+    { keywords: ["식빵", "빵", "bakery", "bread", "소보루", "단팥빵"], url: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=80" },
+    { keywords: ["치즈", "케이크", "cake", "dessert", "마카롱"], url: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop&q=80" },
+    { keywords: ["샌드위치", "sandwich"], url: "https://images.unsplash.com/photo-1509722747041-616f39b57569?w=600&auto=format&fit=crop&q=80" },
+    { keywords: ["커피", "카페", "coffee", "cafe", "음료"], url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=600&auto=format&fit=crop&q=80" },
+    { keywords: ["도시락", "밥", "bento", "rice"], url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop&q=80" }
+  ];
+
+  for (const f of fallbacks) {
+    if (f.keywords.some(k => query.toLowerCase().includes(k))) {
+      return res.json({ imageUrl: f.url, crawled: false });
+    }
+  }
+
+  // Fallback category images
+  const categoryImages: Record<string, string> = {
+    bakery: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop&q=80',
+    cafe: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=600&auto=format&fit=crop&q=80',
+    convenience: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop&q=80',
+    side: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=600&auto=format&fit=crop&q=80',
+    mart: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80'
+  };
+
+  const defaultImg = categoryImages[category] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80';
+  return res.json({ imageUrl: defaultImg, crawled: false });
+});
+
+// 5. AI Food Photo Carbon footprint Analyzer
+app.post("/api/gemini/analyze-carbon-photo", async (req, res) => {
+  const { imageBase64, mimeType } = req.body;
+  if (!imageBase64) {
+    return res.status(400).json({ error: "Image data is required" });
+  }
+
+  const ai = getGeminiClient();
+
+  if (!ai) {
+    // Return a high fidelity mock carbon analysis
+    const items = [
+      {
+        foodName: "소고기 수제 햄버거 패티 세트",
+        estimatedWeight: "약 450g (1인분)",
+        carbonFootprintKg: 6.8,
+        carbonLevel: "HIGH",
+        equivalentTrees: 1.03,
+        carbonAnalysis: "소고기는 다른 육류나 식자재에 비해 메탄 배출과 사료 생산 과정에서 막대한 탄소를 유발합니다. 버거 패티 1장(약 150g)만으로도 자동차 25km를 주행하는 것과 동일한 이산화탄소를 배출하며, 소나무 1그루가 한 달 동안 흡수할 수 있는 양을 훨씬 초과합니다. 또한 치즈와 가공 밀가루 번 역시 추가적인 탄소 배출 요인입니다.",
+        earthSavingTips: [
+          "패티를 대체 단백질(두부, 버섯, 콩고기)로 구성된 식단으로 전환해보세요. 탄소량이 85% 이상 감소합니다.",
+          "유통기한 임박 식재료를 '라스트픽' 플랫폼에서 구출하여 남김없이 소비하는 것만으로도 폐기 시 생기는 온실가스를 100% 방지할 수 있습니다.",
+          "지역에서 생산되는 친환경 로컬 푸드 농산물 토핑(양상추, 토마토)을 사용하면 유통 마일리지를 크게 줄여 배출을 최소화합니다."
+        ],
+        recommendedAlternative: "베이커리(샌드위치) 혹은 편의점(샐러드) 카테고리의 채식 임박 상품을 이용해보세요! 한 끼에 5.8kg의 탄소를 직접 감축하고 70% 할인 득템도 가능합니다."
+      },
+      {
+        foodName: "모듬 수제 마카롱과 생크림 디저트",
+        estimatedWeight: "약 150g (3개 분량)",
+        carbonFootprintKg: 1.2,
+        carbonLevel: "MEDIUM",
+        equivalentTrees: 0.18,
+        carbonAnalysis: "유제품(생크림, 버터) 및 달걀 흰자를 기반으로 하는 제과류는 중간 정도의 탄소를 유발합니다. 젖소 사육 단계의 가스 및 우유 원료 가공 단계에서 에너지가 지속 소비되기 때문입니다. 오븐 베이킹 단계에서의 열에너지 발생도 탄소 발자국에 포함됩니다.",
+        earthSavingTips: [
+          "비건 제과점의 쌀가루와 식물성 크림 기반 디저트를 골라 가치소비해보세요.",
+          "라스트픽의 베이커리 마감할인을 통해 유기 수치가 높은 달콤함을 반값에 구원하고, 매립지의 탄소 배출도 저지하세요.",
+          "텀블러를 챙겨 매장에 픽업 가면 일회용 포장 용기 제조에서 나오는 숨은 탄소 0.15kg까지 완전히 절감할 수 있습니다."
+        ],
+        recommendedAlternative: "카페 및 베이커리 카테고리의 무설탕/비건 임박 디저트 상품을 추천합니다. 친환경 인증 빵류 구출 시 탄소 40% 추가 절감 효과가 있습니다."
+      },
+      {
+        foodName: "아보카도 훈제연어 샐러드 팩",
+        estimatedWeight: "약 300g (1인분)",
+        carbonFootprintKg: 0.85,
+        carbonLevel: "LOW",
+        equivalentTrees: 0.13,
+        carbonAnalysis: "채소와 과일 기반 식단은 배출량이 현저히 낮아 저탄소 친환경 건강식으로 분류됩니다. 수입산 아보카도 및 원거리 수송 연어의 항공/물류 마일리지로 인해 극저탄소(0.3kg 이하)보다는 소폭 상승했지만, 육식 식단 대비 10% 미만의 매우 착한 탄소 발자국입니다.",
+        earthSavingTips: [
+          "국내산 제철 과일과 채소 토핑을 고르면 유통 거리가 짧아져 탄소가 즉시 절반 이하로 감소합니다.",
+          "먹을 만큼만 덜어서 끝까지 신선하게 소비하여 완판 문화를 정착시켜 주세요.",
+          "유통기한 마감 전 '라스트픽' 마트 카테고리의 샐러드 팩을 즉시 구조하면, 폐기 매립으로 발생할 이산화탄소를 완벽 방어합니다."
+        ],
+        recommendedAlternative: "유기농마트 및 반찬가게 카테고리에서 친환경 제철 나물이나 로컬 신선 야채 임박 상품을 골라보세요!"
+      }
+    ];
+
+    // Pick based on base64 string length or return randomly to simulate analysis
+    const selectedMock = items[imageBase64.length % items.length];
+    return res.json(selectedMock);
+  }
+
+  try {
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType || "image/jpeg",
+            data: base64Data
+          }
+        },
+        {
+          text: `당신은 세계적인 ESG 및 친환경 식품 탄소 발자국 분석 전문가입니다.
+업로드된 음식 또는 식료품 사진을 분석하여 다음 정보를 한글로 자세히 도출해주세요.
+
+필요한 JSON 응답 형식:
+{
+  "foodName": "식별된 음식 또는 재료명",
+  "estimatedWeight": "추정 중량 및 분량 (예: 약 250g, 1인분)",
+  "carbonFootprintKg": 1.45, // 이산화탄소 상당량 배출 추정치 (숫자만, kg 단위)
+  "carbonLevel": "HIGH" | "MEDIUM" | "LOW", // 탄소 배출 등급 (소고기/육류는 HIGH, 가공식품/디저트는 MEDIUM, 채소/식물성은 LOW)
+  "equivalentTrees": 0.22, // 이 탄소 배출을 상쇄하기 위해 필요한 소나무 그루수 (탄소배출량 / 6.6, 소수점 둘째자리까지 반올림)
+  "carbonAnalysis": "음식의 주요 원재료에 따른 탄소 발생 원인과 생태적 영향 분석 (구체적이고 이해하기 쉬운 한글 설명)",
+  "earthSavingTips": [
+    "탄소 발자국을 줄이기 위한 구체적인 조리, 보관 또는 라스트픽 마감할인 구출 활용 팁 3가지"
+  ],
+  "recommendedAlternative": "해당 육류/고탄소 식품을 대체하여 탄소를 대폭 줄일 수 있는 라스트픽 마감할인 추천 카테고리 또는 추천 저탄소 메뉴 설명"
+}
+
+답변은 친근하고 직관적이며 전문적인 어조로 한글로 작성해주시기 바랍니다.`
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            foodName: { type: Type.STRING },
+            estimatedWeight: { type: Type.STRING },
+            carbonFootprintKg: { type: Type.NUMBER },
+            carbonLevel: { type: Type.STRING },
+            equivalentTrees: { type: Type.NUMBER },
+            carbonAnalysis: { type: Type.STRING },
+            earthSavingTips: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            recommendedAlternative: { type: Type.STRING }
+          },
+          required: ["foodName", "estimatedWeight", "carbonFootprintKg", "carbonLevel", "equivalentTrees", "carbonAnalysis", "earthSavingTips", "recommendedAlternative"]
+        }
+      }
+    });
+
+    const text = response.text || "{}";
+    const data = JSON.parse(text);
+    res.json(data);
+  } catch (error: any) {
+    console.error("Gemini API photo analysis error:", error);
+    res.status(500).json({ error: error.message || "Failed to analyze food photo carbon footprint" });
+  }
+});
+
 // Setup Vite Dev server or production static serving
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {

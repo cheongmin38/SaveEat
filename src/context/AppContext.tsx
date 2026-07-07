@@ -4,14 +4,14 @@
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, Store, Order, UserStats, AIAnalysisResponse, AICarbonReportResponse } from '../types';
+import { Product, Store, Order, UserStats, AIAnalysisResponse, AICarbonReportResponse, AICarbonPhotoAnalysis } from '../types';
 
 interface AppContextType {
   // Session / Navigation
   currentRole: 'consumer' | 'seller';
   setCurrentRole: (role: 'consumer' | 'seller') => void;
-  consumerTab: 'home' | 'map' | 'favorites' | 'orders' | 'mypage';
-  setConsumerTab: (tab: 'home' | 'map' | 'favorites' | 'orders' | 'mypage') => void;
+  consumerTab: 'home' | 'map' | 'favorites' | 'orders' | 'mypage' | 'carbon-calc';
+  setConsumerTab: (tab: 'home' | 'map' | 'favorites' | 'orders' | 'mypage' | 'carbon-calc') => void;
   sellerTab: 'dashboard' | 'register' | 'orders' | 'stats' | 'settings';
   setSellerTab: (tab: 'dashboard' | 'register' | 'orders' | 'stats' | 'settings') => void;
   
@@ -54,6 +54,10 @@ interface AppContextType {
   aiRecommendations: Record<string, string>; // Maps productId -> AI recommended reason
   fetchAIRecommendations: (category: string) => Promise<void>;
   isLoadingRecommendations: boolean;
+
+  // New features
+  crawlFoodImage: (query: string, category: string) => Promise<string>;
+  analyzeFoodPhotoCarbon: (imageBase64: string, mimeType: string) => Promise<AICarbonPhotoAnalysis>;
   
   // Search & Filters
   searchQuery: string;
@@ -1043,6 +1047,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchAIRecommendations(selectedCategory);
   }, [products.length, selectedCategory]);
 
+  const crawlFoodImage = async (query: string, category: string): Promise<string> => {
+    try {
+      const response = await fetch('/api/crawl-food-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, category })
+      });
+      if (!response.ok) throw new Error('Crawl API response error');
+      const data = await response.json();
+      return data.imageUrl;
+    } catch (err) {
+      console.error('Image crawl failed, fallback to default Unsplash images:', err);
+      // fallback matching
+      const defaultMap: Record<string, string> = {
+        bakery: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=80',
+        cafe: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=600&auto=format&fit=crop&q=80',
+        convenience: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop&q=80',
+        side: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=600&auto=format&fit=crop&q=80',
+        mart: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80'
+      };
+      return defaultMap[category] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80';
+    }
+  };
+
+  const analyzeFoodPhotoCarbon = async (imageBase64: string, mimeType: string): Promise<AICarbonPhotoAnalysis> => {
+    const response = await fetch('/api/gemini/analyze-carbon-photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64, mimeType })
+    });
+    if (!response.ok) {
+      throw new Error('음식 탄소 분석 API 요청 중 오류가 발생했습니다.');
+    }
+    return response.json();
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1081,6 +1121,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         aiRecommendations,
         fetchAIRecommendations,
         isLoadingRecommendations,
+
+        crawlFoodImage,
+        analyzeFoodPhotoCarbon,
         
         searchQuery,
         setSearchQuery,

@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AIAnalysisResponse } from '../types';
 
 export const SellerRegister: React.FC = () => {
-  const { registerProduct, getAIProductAnalysis, isAIAnalyzing } = useApp();
+  const { registerProduct, getAIProductAnalysis, isAIAnalyzing, crawlFoodImage } = useApp();
 
   const [name, setName] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
@@ -25,6 +25,24 @@ export const SellerRegister: React.FC = () => {
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResponse | null>(null);
   const [showAiReport, setShowAiReport] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isCrawling, setIsCrawling] = useState(false);
+
+  const handleCrawlImage = async () => {
+    if (!name) {
+      alert('상품명을 먼저 입력한 후 크롤링 버튼을 눌러주세요.');
+      return;
+    }
+    setIsCrawling(true);
+    try {
+      const crawledUrl = await crawlFoodImage(name, category);
+      setImageUrl(crawledUrl);
+    } catch (err) {
+      console.error(err);
+      alert('이미지 크롤링에 실패하였습니다. 수동 이미지 주소를 사용해주세요.');
+    } finally {
+      setIsCrawling(false);
+    }
+  };
 
   // Predefined gorgeous images for products based on category for seamless visual simulation
   const categoryImages: Record<string, string[]> = {
@@ -329,13 +347,53 @@ export const SellerRegister: React.FC = () => {
               </div>
             </div>
 
-            {/* Photo upload mock */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 block">수령 보관 식품 실물 이미지</label>
-              <div className="border-2 border-dashed border-slate-200 hover:border-orange-300 rounded-2xl p-4 text-center cursor-pointer transition-colors bg-slate-50/50">
-                <p className="text-[10px] text-slate-400 font-bold">카메라 촬영 사진 추가 또는 드래그 앤 드롭</p>
-                <p className="text-[9px] text-slate-400 leading-none mt-0.5">*미업로드 시 AI 카테고리별 신선 이미지가 자동 배정됩니다.</p>
+            {/* AI Image Crawling / Custom Image Setup */}
+            <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <span>식품 대표 이미지 주소 (선택)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCrawlImage}
+                  disabled={isCrawling}
+                  className="text-[10px] text-orange-600 hover:text-orange-700 font-extrabold flex items-center space-x-1"
+                >
+                  {isCrawling ? (
+                    <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 text-orange-500" />
+                      <span>AI 실제 이미지 크롤링 검색</span>
+                    </>
+                  )}
+                </button>
               </div>
+
+              <input
+                type="text"
+                placeholder="이미지 주소를 직접 입력하거나 AI 실제 이미지 크롤링 버튼을 눌러주세요."
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                className="w-full p-2.5 bg-white rounded-xl border border-slate-200/60 text-xs focus:ring-2 focus:ring-orange-400 outline-hidden font-medium placeholder:text-slate-400"
+              />
+
+              {imageUrl ? (
+                <div className="relative rounded-xl overflow-hidden aspect-video max-h-36 bg-slate-100 border border-slate-200">
+                  <img src={imageUrl} alt="Crawled preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl('')}
+                    className="absolute top-2 right-2 bg-black/75 hover:bg-black/90 text-white rounded-full px-2 py-0.5 text-[8px] font-bold"
+                  >
+                    ✕ 이미지 지우기
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[9px] text-slate-400 leading-none">
+                  * 대표 이미지를 비워두면 AI 분류별 대표 신선 이미지가 자동 지정됩니다.
+                </p>
+              )}
             </div>
 
             <button

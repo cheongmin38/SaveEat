@@ -11,18 +11,19 @@ import { ConsumerMap } from './components/ConsumerMap';
 import { ConsumerFavorites } from './components/ConsumerFavorites';
 import { ConsumerOrders } from './components/ConsumerOrders';
 import { ConsumerMyPage } from './components/ConsumerMyPage';
+import { ConsumerCarbonCalc } from './components/ConsumerCarbonCalc';
 import { SellerDashboard } from './components/SellerDashboard';
 import { SellerRegister } from './components/SellerRegister';
 import { SellerStats } from './components/SellerStats';
 
-import { Home, MapPin, Heart, ClipboardList, User, LayoutDashboard, PlusCircle, BarChart3, ShieldAlert } from 'lucide-react';
+import { Home, MapPin, Heart, ClipboardList, User, LayoutDashboard, PlusCircle, BarChart3, ShieldAlert, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const AppContent: React.FC = () => {
   const { currentRole, orders } = useApp();
 
   // Navigation states
-  const [consumerTab, setConsumerTab] = useState<'home' | 'map' | 'favorites' | 'orders' | 'mypage'>('home');
+  const [consumerTab, setConsumerTab] = useState<'home' | 'map' | 'favorites' | 'orders' | 'mypage' | 'carbon-calc'>('home');
   const [sellerTab, setSellerTab] = useState<'dashboard' | 'register' | 'stats'>('dashboard');
 
   const pendingReservationsCount = orders.filter(o => o.status === 'pending').length;
@@ -39,6 +40,8 @@ const AppContent: React.FC = () => {
         return <ConsumerOrders />;
       case 'mypage':
         return <ConsumerMyPage />;
+      case 'carbon-calc':
+        return <ConsumerCarbonCalc />;
       default:
         return <ConsumerHome />;
     }
@@ -55,6 +58,42 @@ const AppContent: React.FC = () => {
       default:
         return <SellerDashboard />;
     }
+  };
+
+  const renderConsumerTabs = () => {
+    const tabs = [
+      { id: 'home', label: '홈', icon: Home },
+      { id: 'map', label: '지도', icon: MapPin },
+      { id: 'carbon-calc', label: '탄소계산기', icon: Camera },
+      { id: 'favorites', label: '단골', icon: Heart },
+      { id: 'orders', label: '주문내역', icon: ClipboardList, badge: pendingReservationsCount > 0 ? pendingReservationsCount : undefined },
+      { id: 'mypage', label: '마이리포트', icon: User }
+    ];
+    return tabs.map((tab) => {
+      const Icon = tab.icon;
+      const isActive = consumerTab === tab.id;
+
+      return (
+        <button
+          key={tab.id}
+          onClick={() => setConsumerTab(tab.id as any)}
+          className={`relative flex flex-col items-center space-y-1 py-1 px-2.5 rounded-full transition-all duration-200 ${
+            isActive 
+              ? 'text-mint-500 scale-105 font-bold' 
+              : 'text-slate-400 hover:text-white font-medium'
+          }`}
+        >
+          <Icon className={`w-4.5 h-4.5 ${isActive ? 'stroke-[2.5px] text-mint-500' : 'stroke-[1.8px]'}`} />
+          <span className="text-[9px] tracking-tight">{tab.label}</span>
+          
+          {tab.badge !== undefined && (
+            <span className="absolute -top-1 -right-1 bg-orange-500 text-white font-bold text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">
+              {tab.badge}
+            </span>
+          )}
+        </button>
+      );
+    });
   };
 
   return (
@@ -76,38 +115,8 @@ const AppContent: React.FC = () => {
               {renderConsumerView()}
 
               {/* Sticky bottom mobile navigation menu bar */}
-              <div className="fixed bottom-4 inset-x-0 bg-slate-900 text-white border border-slate-800 py-3 px-6 z-40 flex justify-around items-center max-w-md mx-auto rounded-full shadow-2xl">
-                {[
-                  { id: 'home', label: '홈', icon: Home },
-                  { id: 'map', label: '지도', icon: MapPin },
-                  { id: 'favorites', label: '단골', icon: Heart },
-                  { id: 'orders', label: '주문내역', icon: ClipboardList, badge: pendingReservationsCount > 0 ? pendingReservationsCount : undefined },
-                  { id: 'mypage', label: '마이리포트', icon: User }
-                ].map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = consumerTab === tab.id;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setConsumerTab(tab.id as any)}
-                      className={`relative flex flex-col items-center space-y-1 py-1 px-3.5 rounded-full transition-all duration-200 ${
-                        isActive 
-                          ? 'text-mint-500 scale-105 font-bold' 
-                          : 'text-slate-400 hover:text-white font-medium'
-                      }`}
-                    >
-                      <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px] text-mint-500' : 'stroke-[1.8px]'}`} />
-                      <span className="text-[10px] tracking-tight">{tab.label}</span>
-                      
-                      {tab.badge !== undefined && (
-                        <span className="absolute -top-1 -right-1 bg-orange-500 text-white font-bold text-[8px] w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
-                          {tab.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              <div className="fixed bottom-4 inset-x-0 bg-slate-900 text-white border border-slate-800 py-3 px-4 z-40 flex justify-around items-center max-w-md mx-auto rounded-full shadow-2xl">
+                {renderConsumerTabs()}
               </div>
             </motion.div>
           )}
