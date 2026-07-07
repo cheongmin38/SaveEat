@@ -1,0 +1,303 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import express from "express";
+import path from "path";
+import { createServer as createViteServer } from "vite";
+import { GoogleGenAI, Type } from "@google/genai";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const app = express();
+const PORT = 3000;
+
+app.use(express.json());
+
+// Lazy-initialized Gemini client
+let aiClient: GoogleGenAI | null = null;
+
+function getGeminiClient(): GoogleGenAI | null {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.includes("API_KEY")) {
+      console.warn("GEMINI_API_KEY is not set or is a placeholder. Using robust fallback simulated AI responses.");
+      return null;
+    }
+    try {
+      aiClient = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+    } catch (e) {
+      console.error("Error creating GoogleGenAI client:", e);
+      return null;
+    }
+  }
+  return aiClient;
+}
+
+// 1. AI Product Prediction & Recommended Discount Rate
+app.post("/api/gemini/analyze-product", async (req, res) => {
+  const { name, originalPrice, quantity, category, expiryDate } = req.body;
+  const ai = getGeminiClient();
+
+  if (!ai) {
+    // Return high quality mock prediction values
+    const originalNum = Number(originalPrice) || 5000;
+    const baseRate = category === 'bakery' ? 45 : category === 'cafe' ? 50 : category === 'convenience' ? 60 : category === 'side' ? 35 : 40;
+    const recommendedRate = Math.min(80, Math.max(20, baseRate + (quantity > 10 ? 15 : quantity > 5 ? 5 : 0)));
+    const probability = Math.floor(Math.random() * 20) + 75; // 75% - 95%
+    const risk = quantity > 12 ? 'HIGH' : (quantity > 5 ? 'MEDIUM' : 'LOW');
+    
+    const marketingHooks: Record<string, string[]> = {
+      bakery: [
+        `🍞 천연 발효종으로 구워 쫄깃 고소한 ${name}! 오늘 마감 전에 데려가시면 가성비 끝판왕 갓빵 등극!`,
+        `🥐 당일 구워내 바삭함이 가득 차 있는 ${name}! 마감 컷! 버려지기엔 너무 아까운 맛이에요.`
+      ],
+      cafe: [
+        `☕ 달콤 시원한 휴식 타임! 기분 좋은 풍미의 ${name}, 딱 지금만 누릴 수 있는 특별 할인가!`,
+        `🧁 지친 오후를 깨우는 달콤 힐링! ${name} 마감 한정 수량, 어서 선점하세요!`
+      ],
+      convenience: [
+        `🍱 오늘 한 끼 든든하게 해결할 구원자! ${name}, 초특가 득템 찬스로 든든하고 환경도 살려요!`,
+        `🍙 한 번 맛보면 헤어나올 수 없는 풍성한 구성의 ${name}! 폐기 위기 탈출 작전 시작!`
+      ],
+      side: [
+        `🍳 집밥 느낌 그대로, 엄마의 정성이 가득한 맛있는 ${name}! 오늘 저녁 반찬 걱정 끝!`,
+        `🥗 한정 수량 특급 세일! 저녁 밥상을 푸짐하게 만들어줄 신선 ${name} 데려가세요.`
+      ],
+      mart: [
+        `🍎 알뜰살뜰 장보기 끝판왕! 산지 직송 부럽지 않은 신선 ${name}, 폐기 Zero 기동대 특별가!`,
+        `🥩 가계 부담은 반으로, 맛은 두 배로! ${name} 한정 세일, 초특가로 득템하세요!`
+      ]
+    };
+
+    const list = marketingHooks[category] || [
+      `🌟 ESG 녹색 수호대 추천! 맛과 퀄리티 보장된 ${name}, 오늘 단 하루 지구 살리기 할인가로 공급합니다.`
+    ];
+    const hook = list[Math.floor(Math.random() * list.length)];
+
+    return res.json({
+      risk,
+      recommendedRate,
+      probability,
+      hook
+    });
+  }
+
+  try {
+    const prompt = `유통기한 임박 및 마감 폐기 예정 식품의 AI 판매 분석을 수행해주세요.
+식품 정보:
+- 상품명: ${name}
+- 카테고리: ${category}
+- 원래 가격(정가): ${originalPrice}원
+- 현재 남은 수량: ${quantity}개
+- 유통기한/폐기 예정 시각: ${expiryDate}
+
+다음 JSON 구조로 응답해주세요:
+{
+  "risk": "HIGH" | "MEDIUM" | "LOW" (폐기될 위험도 분석),
+  "recommendedRate": 원래 가격 대비 추천 할인율 (숫자만, 예: 45),
+  "probability": 이 할인율 적용 시 당일 완판/재고 소진 확률 (숫자만, 예: 85),
+  "hook": "소비자들의 관심을 끌어당길 신선하고 센스 있는 한글 마케팅 홍보 문구 (예: 마감 세일 문구)"
+}
+한국어 구어체로 부드럽고 매력적인 톤으로 마케팅 문구를 생성해주세요. 친환경, 가치소비, 당일생산 등의 매력 키워드를 녹여주세요.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            risk: { type: Type.STRING, description: "HIGH, MEDIUM, or LOW" },
+            recommendedRate: { type: Type.INTEGER, description: "Recommended discount rate percentage (e.g. 50)" },
+            probability: { type: Type.INTEGER, description: "Stock clearance probability percentage (e.g. 85)" },
+            hook: { type: Type.STRING, description: "Slogan tagline in Korean" }
+          },
+          required: ["risk", "recommendedRate", "probability", "hook"]
+        }
+      }
+    });
+
+    const text = response.text || "{}";
+    const data = JSON.parse(text);
+    res.json(data);
+  } catch (error: any) {
+    console.error("Gemini API error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// 2. AI Personalized Carbon & ESG Report
+app.post("/api/gemini/generate-carbon-report", async (req, res) => {
+  const { foodRescuedCount, carbonSavedKg, moneySavedWon } = req.body;
+  const ai = getGeminiClient();
+
+  if (!ai) {
+    // High-quality local mock generator
+    const treeEquivalent = Number((carbonSavedKg / 6.6).toFixed(1));
+    return res.json({
+      summary: `이번 달에 총 ${foodRescuedCount}개의 음식을 구조하여 탄소 배출량 ${carbonSavedKg}kg을 줄이고, ${moneySavedWon.toLocaleString()}원을 아끼는 엄청난 성과를 기록했습니다!`,
+      detailedAnalysis: `회원님이 구조하신 음식들은 유통기한이 임박했던 가치 높은 식품들입니다. 이들을 매립지 폐기 대신 구매함으로써 폐기 과정의 유기 가스 방출을 막고 신선하게 소비했습니다. 이로 인해 저감된 이산화탄소 ${carbonSavedKg}kg은 30년생 소나무 약 ${treeEquivalent}그루가 1년간 공기 중에서 흡수해야 하는 이산화탄소 흡수량과 완전히 같은 환경적 가치를 지닙니다. 소상공인의 폐기물 처리 부담금도 덜어주셨습니다!`,
+      recommendations: [
+        "수령한 빵이나 떡류는 당장 먹지 않는다면 즉시 지퍼백에 밀봉하여 냉동 보관하면 수분 손실 없이 오래 드실 수 있어요.",
+        "신선 반찬류는 수령 후 가급적 냉장고 신선칸 안쪽(약 2~4℃)에 바로 보관하시고 2일 이내 드시는 것을 권장합니다.",
+        "자주 방문하는 동네 빵집과 마트의 단골 설정을 유지하면 '마감임박' Push 알림을 가장 먼저 받아 가장 저렴할 때 알뜰 구조가 가능합니다!"
+      ]
+    });
+  }
+
+  try {
+    const prompt = `소비자의 임박 음식 구조 실적을 바탕으로 맞춤형 'AI 환경 및 탄소 절감 효과 리포트'를 한글로 정교하게 생성해주세요.
+실적 데이터:
+- 구조한 음식 수: ${foodRescuedCount}개
+- 절감한 이산화탄소(CO2): ${carbonSavedKg}kg
+- 절약한 금액: ${moneySavedWon}원
+
+다음 JSON 구조로 반환해주세요:
+{
+  "summary": "핵심 성과 요약 한줄평 (친근하고 따뜻한 격려 톤)",
+  "detailedAnalysis": "환경적 의미와 탄소 배출 감소가 실제로 지구에 주는 구체적인 기여 분석 (예: 소나무 효과 환산 등)",
+  "recommendations": ["환경 보호 및 구조한 식품 보관/소비 팁 3가지 리스트"]
+}
+어조는 매우 친근하고 격려하며 가치를 부여하는 한글 문체로 작성해주세요.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING },
+            detailedAnalysis: { type: Type.STRING },
+            recommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            }
+          },
+          required: ["summary", "detailedAnalysis", "recommendations"]
+        }
+      }
+    });
+
+    const text = response.text || "{}";
+    const data = JSON.parse(text);
+    res.json(data);
+  } catch (error: any) {
+    console.error("Gemini API error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// 3. AI Smart Recommended Products matching
+app.post("/api/gemini/recommendations", async (req, res) => {
+  const { products, preferredCategory } = req.body;
+  const ai = getGeminiClient();
+
+  if (!ai) {
+    const recommendedList = products.map((p: any) => {
+      let reason = `현재 마감 시간 한 시간 전인 골든 타임 상품입니다.`;
+      if (p.category === 'bakery') {
+        reason = `오늘 아침 매장에서 신선하게 구운 식빵류로, 방부제가 들어있지 않아 맛과 탄소 저감 가치가 가장 높은 최적의 매칭입니다.`;
+      } else if (p.category === 'convenience') {
+        reason = `간편하게 든든한 한끼 식사가 가능하며, 삼각김밥/도시락류는 폐기 마감 전 구매율이 가장 높아 멸종 위기 음식을 살리는 긴급 픽업 대상입니다.`;
+      } else if (p.category === 'cafe') {
+        reason = `쌉싸름한 아메리카노와 어울리는 촉촉한 디저트입니다. 기분 전환을 하면서 탄소 배출도 줄일 수 있는 일석이조 가치 소비 아이템입니다.`;
+      } else if (p.category === 'side') {
+        reason = `조미료를 최소화하여 만든 정갈한 가치 소비 밑반찬입니다. 바쁜 저녁 한 끼 밥상을 환경 사랑과 저렴함으로 가득 채워줍니다.`;
+      } else if (p.category === 'mart') {
+        reason = `신선 냉장 보관 중인 마트 고품질 제품으로 정가 대비 할인율 폭이 가장 크며, 쓰레기 매립 매연 저감에 으뜸 기여를 합니다.`;
+      }
+      return {
+        productId: p.id,
+        reason
+      };
+    });
+    return res.json({ recommendations: recommendedList });
+  }
+
+  try {
+    const productSummary = products.map((p: any) => `ID: ${p.id}, 이름: ${p.name}, 정가: ${p.originalPrice}, 할인가: ${p.discountPrice}, 유통기한: ${p.expiryDate}, 카테고리: ${p.category}`).join("\n");
+    const prompt = `사용자의 선호 카테고리(${preferredCategory || "전체"})와 환경 보호 트렌드를 고려하여, 현재 판매 중인 임박 식품 리스트 중 AI 맞춤형 추천 상품과 매칭 이유를 정교하게 작성해주세요.
+    
+판매 중인 식품 리스트:
+${productSummary}
+
+다음 JSON 구조로 반환해주세요:
+{
+  "recommendations": [
+    {
+      "productId": "식품 ID",
+      "reason": "소비자에게 해당 식품을 추천하는 개별 맞춤형 한글 이유 설명 (예: 저녁 반찬 고민 해결, 신선도가 매우 우수함, 마감 임박으로 탄소 절감 기여도 극대화 등)"
+    }
+  ]
+}
+친절하고 맛깔나는 마케팅 톤으로 작성해주세요.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            recommendations: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  productId: { type: Type.STRING },
+                  reason: { type: Type.STRING }
+                },
+                required: ["productId", "reason"]
+              }
+            }
+          },
+          required: ["recommendations"]
+        }
+      }
+    });
+
+    const text = response.text || "{}";
+    const data = JSON.parse(text);
+    res.json(data);
+  } catch (error: any) {
+    console.error("Gemini API error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// Setup Vite Dev server or production static serving
+async function startServer() {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();

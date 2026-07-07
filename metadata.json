@@ -1,0 +1,6 @@
+{
+  "name": "라스트픽(LastPick)",
+  "description": "라스트픽은 유통기한 임박 식품과 당일 폐기 예정 상품을 실시간 매칭하는 ESG 기반 지역 친환경 마감할인 플랫폼입니다. 버려지는 음식물 쓰레기를 줄이고, 소비자 장바구니 물가를 낮추며, 소상공인의 손실을 방지합니다.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
