@@ -83,5 +83,11 @@ export interface AICarbonPhotoAnalysis {
   carbonAnalysis: string;
   earthSavingTips: string[];
   recommendedAlternative: string;
+  ingredients: {
+    name: string;
+    weightG: number;
+    co2G: number; // in grams
+    ratio: number; // percentage (0~100)
+  }[];
 }
 

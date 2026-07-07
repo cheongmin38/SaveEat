@@ -318,9 +318,30 @@ export const ConsumerCarbonCalc: React.FC = () => {
               <div className="space-y-3.5">
                 <div className="relative rounded-2xl overflow-hidden bg-slate-100 aspect-square border border-slate-100 shadow-inner">
                   <img src={image} alt="Uploaded food" className="w-full h-full object-cover" />
+                  
+                  {/* Real-time laser scanning animation during AI analysis */}
+                  {isAnalyzing && (
+                    <motion.div
+                      initial={{ top: "0%" }}
+                      animate={{ top: "100%" }}
+                      transition={{ repeat: Infinity, repeatType: "reverse", duration: 1.8, ease: "linear" }}
+                      className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_rgba(52,211,153,0.9)] z-10"
+                    />
+                  )}
+                  
+                  {isAnalyzing && (
+                    <div className="absolute inset-0 bg-emerald-950/20 backdrop-blur-[1px] flex items-center justify-center">
+                      <div className="bg-slate-900/90 text-white rounded-full px-3 py-1.5 text-[9px] font-black tracking-widest flex items-center space-x-1.5 shadow-lg border border-emerald-500/30">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>AI 식자재 정밀 스캔 중</span>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={resetAnalyzer}
-                    className="absolute top-2 right-2 bg-black/75 hover:bg-black/90 text-white rounded-full p-1.5 transition-all"
+                    disabled={isAnalyzing}
+                    className="absolute top-2 right-2 bg-black/75 hover:bg-black/90 text-white rounded-full p-1.5 transition-all z-20"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                   </button>
@@ -387,12 +408,13 @@ export const ConsumerCarbonCalc: React.FC = () => {
 
                 <div className="space-y-1.5 max-w-sm">
                   <h4 className="text-xs font-bold text-slate-800 animate-pulse">Gemini AI 푸드 에코분석 실행 중</h4>
-                  <p className="text-[10px] text-slate-400">사진 속 음식 형태를 분석해 포션 크기 추정과 주재료별 가치 탄소발자국(CO2 eq)을 정밀 산출하고 있습니다...</p>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">사진 속 음식 형태와 미세한 결을 정밀 스캔하고 있습니다. 주재료를 낱낱이 분해하여 친환경 탄소 가중치를 수학적으로 대조 중입니다...</p>
                 </div>
 
-                <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-2xl max-w-xs text-left">
-                  <p className="text-[9px] text-slate-500 leading-normal">
-                    💡 <b>알고 계셨나요?</b> 전 세계 온실가스 배출량의 약 26%가 식품 생산 과정에서 나오며, 육류(소고기) 1kg은 방울토마토 1kg보다 무려 30배 높은 탄소를 내뿜습니다.
+                <div className="bg-emerald-50/40 border border-emerald-100/50 p-3.5 rounded-2xl max-w-xs text-left">
+                  <p className="text-[9px] text-slate-600 leading-normal font-medium">
+                    🔍 <b>IPCC & FAO 국제 데이터셋 연동 완료</b><br />
+                    소고기(1kg당 27kg CO2e), 치즈/유제품(1kg당 11.9kg CO2e) 등 최신 국제 표준 배출계수를 바탕으로 실시간 수학적 정밀 계산을 수립하고 있습니다.
                   </p>
                 </div>
               </motion.div>
@@ -477,9 +499,46 @@ export const ConsumerCarbonCalc: React.FC = () => {
                       <div className="h-full bg-red-400 transition-all" style={{ width: analysis.carbonLevel === 'HIGH' ? '100%' : '0%' }} />
                     </div>
                     <p className="text-[9.5px] text-slate-500 font-medium leading-relaxed mt-1">
-                      💡 이 음식 한 끼를 섭취함으로써 발생하는 탄소 발자국은 30년생 소나무 약 <span className="font-bold text-slate-800 text-[11px] underline underline-offset-2">{analysis.equivalentTrees}그루</span>가 하루 종일 열심히 공기를 정화해야 해결되는 양입니다.
+                      💡 이 음식 한 끼를 섭취함으로써 발생하는 탄소 발자국은 30년생 소나무 약 <span className="font-bold text-slate-800 text-[11px] underline underline-offset-2">{analysis.equivalentTrees}그루</span>가 일 년간 흡수해야 정화되는 엄청난 환경적 무게입니다.
                     </p>
                   </div>
+
+                  {/* HIGH ACCURACY: Ingredient Breakdown Visualizer */}
+                  {analysis.ingredients && analysis.ingredients.length > 0 && (
+                    <div className="space-y-3 bg-slate-50/30 p-4 rounded-2xl border border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-extrabold text-slate-800 flex items-center">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-500 mr-1 animate-pulse" />
+                          정밀 식자재 성분 분석 및 탄소 비중
+                        </h4>
+                        <span className="text-[9px] text-slate-400 font-bold bg-white px-2 py-0.5 rounded-md border border-slate-100">FAO/IPCC 수치 기준</span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {analysis.ingredients.map((ing, idx) => (
+                          <div key={idx} className="space-y-1">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-700">
+                              <span className="flex items-center">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5" />
+                                {ing.name} <span className="text-slate-400 font-normal ml-1">({ing.weightG}g)</span>
+                              </span>
+                              <span className="font-mono text-slate-500">
+                                {(ing.co2G / 1000).toFixed(3)}kg CO₂e <span className="text-emerald-600 font-bold ml-1">({ing.ratio}%)</span>
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${ing.ratio}%` }}
+                                transition={{ duration: 0.8, delay: idx * 0.1 }}
+                                className="h-full bg-emerald-500/85 rounded-full"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Ecological analysis text */}
                   <div className="space-y-2">

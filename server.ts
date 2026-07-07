@@ -353,7 +353,7 @@ app.post("/api/gemini/analyze-carbon-photo", async (req, res) => {
   const ai = getGeminiClient();
 
   if (!ai) {
-    // Return a high fidelity mock carbon analysis
+    // Return a high fidelity mock carbon analysis with detailed ingredients breakdown
     const items = [
       {
         foodName: "소고기 수제 햄버거 패티 세트",
@@ -361,13 +361,20 @@ app.post("/api/gemini/analyze-carbon-photo", async (req, res) => {
         carbonFootprintKg: 6.8,
         carbonLevel: "HIGH",
         equivalentTrees: 1.03,
-        carbonAnalysis: "소고기는 다른 육류나 식자재에 비해 메탄 배출과 사료 생산 과정에서 막대한 탄소를 유발합니다. 버거 패티 1장(약 150g)만으로도 자동차 25km를 주행하는 것과 동일한 이산화탄소를 배출하며, 소나무 1그루가 한 달 동안 흡수할 수 있는 양을 훨씬 초과합니다. 또한 치즈와 가공 밀가루 번 역시 추가적인 탄소 배출 요인입니다.",
+        carbonAnalysis: "이 소고기 수제 햄버거 세트의 총 탄소 발자국은 약 6.8kg CO2e로 고탄소 식단에 해당합니다. 소고기는 메탄가스 배출 및 사료 가공 에너지 소모로 인해 다른 육류보다 약 3~5배 이상 많은 온실가스를 발생시킵니다. 수제 패티(약 150g)만으로 약 4.05kg의 CO2가 발생하며, 치즈와 소스 등 유제품 가공과 밀가루 빵(번) 제조, 감자 튀김의 튀김 기름 열 에너지 등이 추가적인 탄소 유발 요인입니다.",
         earthSavingTips: [
           "패티를 대체 단백질(두부, 버섯, 콩고기)로 구성된 식단으로 전환해보세요. 탄소량이 85% 이상 감소합니다.",
           "유통기한 임박 식재료를 '라스트픽' 플랫폼에서 구출하여 남김없이 소비하는 것만으로도 폐기 시 생기는 온실가스를 100% 방지할 수 있습니다.",
           "지역에서 생산되는 친환경 로컬 푸드 농산물 토핑(양상추, 토마토)을 사용하면 유통 마일리지를 크게 줄여 배출을 최소화합니다."
         ],
-        recommendedAlternative: "베이커리(샌드위치) 혹은 편의점(샐러드) 카테고리의 채식 임박 상품을 이용해보세요! 한 끼에 5.8kg의 탄소를 직접 감축하고 70% 할인 득템도 가능합니다."
+        recommendedAlternative: "베이커리(샌드위치) 혹은 편의점(샐러드) 카테고리의 채식 임박 상품을 이용해보세요! 한 끼에 5.8kg의 탄소를 직접 감축하고 70% 할인 득템도 가능합니다.",
+        ingredients: [
+          { name: "소고기 패티", weightG: 150, co2G: 4050, ratio: 60 },
+          { name: "밀가루 빵 (번)", weightG: 80, co2G: 104, ratio: 15 },
+          { name: "가공 치즈 (유제품)", weightG: 30, co2G: 357, ratio: 12 },
+          { name: "감자 및 튀김용 식물성유", weightG: 120, co2G: 144, ratio: 9 },
+          { name: "양상추 & 소스", weightG: 70, co2G: 145, ratio: 4 }
+        ]
       },
       {
         foodName: "모듬 수제 마카롱과 생크림 디저트",
@@ -375,13 +382,19 @@ app.post("/api/gemini/analyze-carbon-photo", async (req, res) => {
         carbonFootprintKg: 1.2,
         carbonLevel: "MEDIUM",
         equivalentTrees: 0.18,
-        carbonAnalysis: "유제품(생크림, 버터) 및 달걀 흰자를 기반으로 하는 제과류는 중간 정도의 탄소를 유발합니다. 젖소 사육 단계의 가스 및 우유 원료 가공 단계에서 에너지가 지속 소비되기 때문입니다. 오븐 베이킹 단계에서의 열에너지 발생도 탄소 발자국에 포함됩니다.",
+        carbonAnalysis: "이 디저트 세트의 총 탄소 발자국은 약 1.2kg CO2e로 중탄소 식단에 해당합니다. 버터, 우유, 생크림 같은 유제품 가공품과 달걀 흰자가 주원료이기 때문입니다. 젖소 사육 중 배출되는 가스 및 냉장 유통망 가동 에너지가 주된 이산화탄소 배출원이며, 제과 오븐의 고온 가열 열에너지 소비도 한 몫을 차지합니다.",
         earthSavingTips: [
           "비건 제과점의 쌀가루와 식물성 크림 기반 디저트를 골라 가치소비해보세요.",
           "라스트픽의 베이커리 마감할인을 통해 유기 수치가 높은 달콤함을 반값에 구원하고, 매립지의 탄소 배출도 저지하세요.",
           "텀블러를 챙겨 매장에 픽업 가면 일회용 포장 용기 제조에서 나오는 숨은 탄소 0.15kg까지 완전히 절감할 수 있습니다."
         ],
-        recommendedAlternative: "카페 및 베이커리 카테고리의 무설탕/비건 임박 디저트 상품을 추천합니다. 친환경 인증 빵류 구출 시 탄소 40% 추가 절감 효과가 있습니다."
+        recommendedAlternative: "카페 및 베이커리 카테고리의 무설탕/비건 임박 디저트 상품을 추천합니다. 친환경 인증 빵류 구출 시 탄소 40% 추가 절감 효과가 있습니다.",
+        ingredients: [
+          { name: "생크림 및 우유 (유제품)", weightG: 60, co2G: 714, ratio: 60 },
+          { name: "달걀 (아몬드가루 포함)", weightG: 40, co2G: 192, ratio: 16 },
+          { name: "설탕 및 가공 감미료", weightG: 35, co2G: 94, ratio: 14 },
+          { name: "포장 및 매장 가공 에너지", weightG: 15, co2G: 200, ratio: 10 }
+        ]
       },
       {
         foodName: "아보카도 훈제연어 샐러드 팩",
@@ -389,13 +402,19 @@ app.post("/api/gemini/analyze-carbon-photo", async (req, res) => {
         carbonFootprintKg: 0.85,
         carbonLevel: "LOW",
         equivalentTrees: 0.13,
-        carbonAnalysis: "채소와 과일 기반 식단은 배출량이 현저히 낮아 저탄소 친환경 건강식으로 분류됩니다. 수입산 아보카도 및 원거리 수송 연어의 항공/물류 마일리지로 인해 극저탄소(0.3kg 이하)보다는 소폭 상승했지만, 육식 식단 대비 10% 미만의 매우 착한 탄소 발자국입니다.",
+        carbonAnalysis: "이 아보카도 훈제연어 샐러드는 약 0.85kg CO2e의 저탄소 친환경 건강 식단입니다. 신선 채소류의 경우 온실가스 배출 계수가 매우 낮아 환경 수호에 탁월합니다. 다만, 멕시코산 아보카도 및 원거리 수입산 연어의 장거리 수송 물류(푸드 마일리지)로 인해 로컬 식단보다는 탄소가 소폭 발생하였습니다.",
         earthSavingTips: [
           "국내산 제철 과일과 채소 토핑을 고르면 유통 거리가 짧아져 탄소가 즉시 절반 이하로 감소합니다.",
           "먹을 만큼만 덜어서 끝까지 신선하게 소비하여 완판 문화를 정착시켜 주세요.",
           "유통기한 마감 전 '라스트픽' 마트 카테고리의 샐러드 팩을 즉시 구조하면, 폐기 매립으로 발생할 이산화탄소를 완벽 방어합니다."
         ],
-        recommendedAlternative: "유기농마트 및 반찬가게 카테고리에서 친환경 제철 나물이나 로컬 신선 야채 임박 상품을 골라보세요!"
+        recommendedAlternative: "유기농마트 및 반찬가게 카테고리에서 친환경 제철 나물이나 로컬 신선 야채 임박 상품을 골라보세요!",
+        ingredients: [
+          { name: "수입산 아보카도 및 채소류", weightG: 210, co2G: 168, ratio: 45 },
+          { name: "훈제 연어 (수산물)", weightG: 50, co2G: 270, ratio: 32 },
+          { name: "올리브유 드레싱", weightG: 25, co2G: 112, ratio: 13 },
+          { name: "수송 및 항공 푸드마일리지", weightG: 15, co2G: 300, ratio: 10 }
+        ]
       }
     ];
 
@@ -416,24 +435,52 @@ app.post("/api/gemini/analyze-carbon-photo", async (req, res) => {
           }
         },
         {
-          text: `당신은 세계적인 ESG 및 친환경 식품 탄소 발자국 분석 전문가입니다.
-업로드된 음식 또는 식료품 사진을 분석하여 다음 정보를 한글로 자세히 도출해주세요.
+          text: `당신은 전 세계의 ESG 연구 및 친환경 식품 산업을 주도하는 최고 권위의 '식품 탄소 발자국 정밀 분석 인공지능 전문가'입니다.
+업로드된 음식 또는 식료품 사진을 극도로 정밀하게 스캔하여, 음식 내에 포함된 개별 식자재 성분들을 정확하게 분해하고, 공신력 있는 IPCC 및 FAO 탄소 배출량 표준 통계를 기반으로 한 엄격한 수학적 연산을 통해 최고의 신뢰도를 갖춘 탄소 발자국 리포트를 한글로 작성해 주세요.
 
-필요한 JSON 응답 형식:
+[정밀 분석 가이드라인 - 탄소 계산 표준 법칙]
+1. 사진 속에 찍힌 주재료와 부재료를 육안 판별하고, 1인분(또는 사진에 나타난 전량) 기준의 예상 중량을g(그램) 단위로 추정합니다.
+2. 각 식자재 성분별로 다음의 고착화된 표준 탄소 배출 계수(1kg당 CO2 상당량)를 적용하여 정교하게 곱한 후 합산하십시오.
+   - 소고기(Beef): 27.0 kg CO2e / kg (가장 높은 배출원)
+   - 돼지고기(Pork): 12.1 kg CO2e / kg
+   - 닭고기/가금류(Poultry): 6.9 kg CO2e / kg
+   - 생선/수산물(Fish/Seafood): 5.4 kg CO2e / kg
+   - 유제품(치즈, 버터, 크림, 우유): 11.9 kg CO2e / kg
+   - 달걀/알류(Eggs): 4.8 kg CO2e / kg
+   - 밀가루/빵/곡류/밥(Rice/Wheat): 1.3 kg CO2e / kg
+   - 가공 소스 및 유지류(Oil/Sauces): 4.5 kg CO2e / kg
+   - 채소/야채/과일/기타 식물성 원재료(Vegetables/Fruits): 0.4 kg CO2e / kg
+3. 전체 성분의 합산 탄소배출량을 'carbonFootprintKg'로 설정하십시오.
+4. 소나무 그루수('equivalentTrees')는 국립산림과학원 통계(30년생 소나무 한 그루의 연간 이산화탄소 흡수량 = 약 6.6kg)에 기반하여 다음의 수식으로 정확히 산출하십시오:
+   - 공식: equivalentTrees = (carbonFootprintKg / 6.6) 의 반올림 소수점 둘째자리 값.
+5. 탄소배출 등급('carbonLevel') 기준:
+   - LOW: 총 배출량 1.0kg 이하 (환경 친화적 식단)
+   - MEDIUM: 총 배출량 1.0kg 초과 ~ 3.0kg 이하 (중등 수준)
+   - HIGH: 총 배출량 3.0kg 초과 (주의가 필요한 고탄소 육식 위주 식단)
+
+필요한 반환 JSON 구조:
 {
-  "foodName": "식별된 음식 또는 재료명",
-  "estimatedWeight": "추정 중량 및 분량 (예: 약 250g, 1인분)",
-  "carbonFootprintKg": 1.45, // 이산화탄소 상당량 배출 추정치 (숫자만, kg 단위)
-  "carbonLevel": "HIGH" | "MEDIUM" | "LOW", // 탄소 배출 등급 (소고기/육류는 HIGH, 가공식품/디저트는 MEDIUM, 채소/식물성은 LOW)
-  "equivalentTrees": 0.22, // 이 탄소 배출을 상쇄하기 위해 필요한 소나무 그루수 (탄소배출량 / 6.6, 소수점 둘째자리까지 반올림)
-  "carbonAnalysis": "음식의 주요 원재료에 따른 탄소 발생 원인과 생태적 영향 분석 (구체적이고 이해하기 쉬운 한글 설명)",
+  "foodName": "식별된 구체적 음식명",
+  "estimatedWeight": "추정 총 중량 및 분량 설명 (예: 약 380g, 1.2인분)",
+  "carbonFootprintKg": 4.12, // 총 합산 이산화탄소 배출량 (숫자만, kg 단위)
+  "carbonLevel": "HIGH" | "MEDIUM" | "LOW",
+  "equivalentTrees": 0.62, // 상쇄에 필요한 연간 소나무 그루수 (수식 결과 적용)
+  "carbonAnalysis": "음식을 구성하는 주요 원재료에 따른 탄소 배출량 발생 요인 설명 및 푸드 마일리지, 공정 에너지를 깊이 있게 해설한 정밀 진단 텍스트 (전문적이고 신뢰도 높은 한글 해설)",
   "earthSavingTips": [
-    "탄소 발자국을 줄이기 위한 구체적인 조리, 보관 또는 라스트픽 마감할인 구출 활용 팁 3가지"
+    "탄소 발자국을 더 줄이기 위한 실질적인 행동 조언, 식자재 보관법, 마감할인 '라스트픽' 구출 활용 팁 3가지"
   ],
-  "recommendedAlternative": "해당 육류/고탄소 식품을 대체하여 탄소를 대폭 줄일 수 있는 라스트픽 마감할인 추천 카테고리 또는 추천 저탄소 메뉴 설명"
+  "recommendedAlternative": "소비자가 이 메뉴를 선호한다면, 탄소를 대폭 줄이면서 만족감을 채울 수 있는 최적의 대체 저탄소 식단 또는 라스트픽 내의 추천 카테고리 제품 추천",
+  "ingredients": [
+    {
+      "name": "식재료 성분명 (예: 소고기 패티, 생크림, 양상추 등)",
+      "weightG": 150, // 추정 무게 (그램)
+      "co2G": 4050, // 이 성분에서 발생하는 이산화탄소량 (g 단위, weightG * 배출계수)
+      "ratio": 65 // 총 발생 탄소량 중 본 재료가 차지하는 백분율 비율 (0~100)
+    }
+  ]
 }
 
-답변은 친근하고 직관적이며 전문적인 어조로 한글로 작성해주시기 바랍니다.`
+주의: 반환되는 모든 한글 텍스트는 신뢰할 수 있고 정확하며 전문적인 어조를 지키되, 일반 소비자도 쉽게 체감할 수 있는 따뜻한 뉘앙스를 유지해 주십시오.`
         }
       ],
       config: {
@@ -451,9 +498,22 @@ app.post("/api/gemini/analyze-carbon-photo", async (req, res) => {
               type: Type.ARRAY,
               items: { type: Type.STRING }
             },
-            recommendedAlternative: { type: Type.STRING }
+            recommendedAlternative: { type: Type.STRING },
+            ingredients: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  weightG: { type: Type.NUMBER },
+                  co2G: { type: Type.NUMBER },
+                  ratio: { type: Type.NUMBER }
+                },
+                required: ["name", "weightG", "co2G", "ratio"]
+              }
+            }
           },
-          required: ["foodName", "estimatedWeight", "carbonFootprintKg", "carbonLevel", "equivalentTrees", "carbonAnalysis", "earthSavingTips", "recommendedAlternative"]
+          required: ["foodName", "estimatedWeight", "carbonFootprintKg", "carbonLevel", "equivalentTrees", "carbonAnalysis", "earthSavingTips", "recommendedAlternative", "ingredients"]
         }
       }
     });
