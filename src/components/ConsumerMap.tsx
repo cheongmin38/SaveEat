@@ -27,16 +27,17 @@ const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: num
 };
 
 export const ConsumerMap: React.FC = () => {
-  const { stores, products, toggleSubscribeStore, createReservation } = useApp();
+  const { stores, products, toggleSubscribeStore, createReservation, userLocation, setUserLocation, userAddress } = useApp();
   const [selectedStore, setSelectedStore] = useState<Store | null>(stores[0]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [reserveQty, setReserveQty] = useState(1);
   const [reserveSuccess, setReserveSuccess] = useState(false);
 
-  // Real-time GPS Geolocation states
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // Real-time GPS Geolocation states (synchronized with AppContext)
   const [isLocating, setIsLocating] = useState(false);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'active' | 'error'>('idle');
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'active' | 'error'>(() => {
+    return userLocation ? 'active' : 'idle';
+  });
   const [locationErrorMessage, setLocationErrorMessage] = useState<string | null>(null);
 
   // Leaflet Map Refs
@@ -78,10 +79,15 @@ export const ConsumerMap: React.FC = () => {
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Create Leaflet Map Instance (default center around Mapo-gu Sinchon)
+    // Use current user location if available, otherwise Sinchon
+    const initialCenter: [number, number] = userLocation 
+      ? [userLocation.lat, userLocation.lng]
+      : [37.5512, 126.9324];
+
+    // Create Leaflet Map Instance
     const map = L.map(mapContainerRef.current, {
-      center: [37.5512, 126.9324],
-      zoom: 15,
+      center: initialCenter,
+      zoom: userLocation ? 16 : 15,
       zoomControl: false,
       attributionControl: true
     });
@@ -230,6 +236,11 @@ export const ConsumerMap: React.FC = () => {
     );
   };
 
+  // Auto locate user on map load
+  useEffect(() => {
+    handleFindMyLocation();
+  }, []);
+
   // Zoom Helpers
   const handleZoomIn = () => {
     if (mapRef.current) {
@@ -365,6 +376,11 @@ export const ConsumerMap: React.FC = () => {
                 {isLocating ? 'GPS 위치 수신 중...' : locationStatus === 'active' ? 'GPS 실시간 현위치 연동됨' : '마포구 창전동 일대 매칭'}
               </span>
             </div>
+            {locationStatus === 'active' && userAddress && (
+              <span className="text-[10px] text-slate-500 font-semibold mt-0.5 truncate leading-tight">
+                {userAddress}
+              </span>
+            )}
             {locationErrorMessage && (
               <span className="text-[9px] text-red-500 font-semibold mt-0.5 leading-tight">{locationErrorMessage}</span>
             )}

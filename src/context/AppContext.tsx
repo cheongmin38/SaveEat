@@ -15,6 +15,12 @@ interface AppContextType {
   sellerTab: 'dashboard' | 'register' | 'orders' | 'stats' | 'settings';
   setSellerTab: (tab: 'dashboard' | 'register' | 'orders' | 'stats' | 'settings') => void;
   
+  // Geolocation
+  userLocation: { lat: number; lng: number } | null;
+  setUserLocation: (loc: { lat: number; lng: number } | null) => void;
+  userAddress: string;
+  setUserAddress: (addr: string) => void;
+  
   // Data State
   stores: Store[];
   products: Product[];
@@ -245,6 +251,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [consumerTab, setConsumerTab] = useState<'home' | 'map' | 'favorites' | 'orders' | 'mypage'>('home');
   const [sellerTab, setSellerTab] = useState<'dashboard' | 'register' | 'orders' | 'stats' | 'settings'>('dashboard');
+
+  // Geolocation States and Effects
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userAddress, setUserAddress] = useState<string>('서울시 마포구 창전동 주변 📍');
+
+  // Reverse Geocoding with OSM Nominatim API
+  useEffect(() => {
+    if (!userLocation) return;
+    
+    const reverseGeocode = async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json&accept-language=ko`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const addressObj = data.address;
+          if (addressObj) {
+            const city = addressObj.province || addressObj.city || addressObj.metro_division || '';
+            const borough = addressObj.borough || addressObj.suburb || addressObj.city_district || addressObj.district || '';
+            const road = addressObj.road || addressObj.neighbourhood || addressObj.village || '';
+            const niceAddress = `${city} ${borough} ${road}`.trim().replace(/\s+/g, ' ');
+            if (niceAddress) {
+              setUserAddress(niceAddress + ' 📍');
+              return;
+            }
+          }
+          if (data.display_name) {
+            const shortened = data.display_name.split(',').slice(0, 3).reverse().join(' ').trim();
+            setUserAddress(shortened + ' 📍');
+          }
+        }
+      } catch (err) {
+        console.error('Reverse geocoding failed:', err);
+      }
+    };
+
+    reverseGeocode();
+  }, [userLocation]);
+
+  // Auto Geolocate on app load
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+        },
+        (error) => {
+          console.warn('Initial geolocation permission or signal failed:', error);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+  }, []);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -590,6 +651,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setConsumerTab,
         sellerTab,
         setSellerTab,
+        
+        userLocation,
+        setUserLocation,
+        userAddress,
+        setUserAddress,
         
         stores,
         products,

@@ -9,7 +9,7 @@ import { Leaf, Store, MapPin, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export const Header: React.FC = () => {
-  const { currentRole, setCurrentRole, stats } = useApp();
+  const { currentRole, setCurrentRole, stats, userAddress } = useApp();
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-xs">
@@ -40,7 +40,7 @@ export const Header: React.FC = () => {
           {/* Location for context */}
           <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-slate-200/60 rounded-full text-xs text-slate-600 font-medium">
             <MapPin className="w-3.5 h-3.5 text-mint-500" />
-            <span>서울시 마포구 창전동 주변 📍</span>
+            <span>{userAddress}</span>
           </div>
 
           {/* Role Switching Tabs (Consumer / Seller / IR Hub) */}
