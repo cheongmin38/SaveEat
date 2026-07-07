@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { MapPin, Navigation, Star, Heart, Clock, ChevronRight, ShieldAlert, Sparkles, Footprints, Locate, Plus, Minus } from 'lucide-react';
+import { MapPin, Navigation, Star, Heart, Clock, ChevronRight, ShieldAlert, Sparkles, Footprints, Locate, Plus, Minus, Maximize2, Minimize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Store, Product } from '../types';
 import L from 'leaflet';
@@ -27,18 +27,32 @@ const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: num
 };
 
 export const ConsumerMap: React.FC = () => {
-  const { stores, products, toggleSubscribeStore, createReservation, userLocation, setUserLocation, userAddress } = useApp();
+  const { 
+    stores, 
+    products, 
+    toggleSubscribeStore, 
+    createReservation, 
+    userLocation, 
+    userAddress,
+    isLocating,
+    locationStatus,
+    locationErrorMessage,
+    findMyLocation 
+  } = useApp();
   const [selectedStore, setSelectedStore] = useState<Store | null>(stores[0]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [reserveQty, setReserveQty] = useState(1);
   const [reserveSuccess, setReserveSuccess] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Real-time GPS Geolocation states (synchronized with AppContext)
-  const [isLocating, setIsLocating] = useState(false);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'active' | 'error'>(() => {
-    return userLocation ? 'active' : 'idle';
-  });
-  const [locationErrorMessage, setLocationErrorMessage] = useState<string | null>(null);
+  // Trigger Leaflet map invalidateSize when fullscreen state changes
+  useEffect(() => {
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+      }, 150);
+    }
+  }, [isFullscreen]);
 
   // Leaflet Map Refs
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +113,11 @@ export const ConsumerMap: React.FC = () => {
     }).addTo(map);
 
     mapRef.current = map;
+
+    // Force map to update size instantly on mount
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
 
     return () => {
       if (mapRef.current) {
@@ -195,50 +214,27 @@ export const ConsumerMap: React.FC = () => {
     }
   }, [stores, selectedStore, userLocation]);
 
-  // Geolocation Handler
+  // Geolocation Handler using context
   const handleFindMyLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationStatus('error');
-      setLocationErrorMessage('이 브라우저에서는 GPS 실시간 위치 조회를 지원하지 않습니다.');
-      return;
-    }
-
-    setIsLocating(true);
-    setLocationErrorMessage(null);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const newLocation = { lat: latitude, lng: longitude };
-        setUserLocation(newLocation);
-        setLocationStatus('active');
-        setIsLocating(false);
-
-        // Pan & zoom smoothly to user's real location
-        if (mapRef.current) {
-          mapRef.current.flyTo([latitude, longitude], 16, {
-            duration: 1.5
-          });
-        }
-      },
-      (error) => {
-        console.error('GPS error:', error);
-        setIsLocating(false);
-        setLocationStatus('error');
-        setLocationErrorMessage('위치 권한이 거부되었거나 신호가 약합니다. 서울 마포구 창전동 기준으로 매칭합니다.');
-        
-        // Return focus to map center default area
-        if (mapRef.current) {
-          mapRef.current.flyTo([37.5512, 126.9324], 15);
-        }
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    findMyLocation((latitude, longitude) => {
+      // Pan & zoom smoothly to user's real location
+      if (mapRef.current) {
+        mapRef.current.flyTo([latitude, longitude], 16, {
+          duration: 1.5
+        });
+      }
+    });
   };
 
-  // Auto locate user on map load
+  // Auto locate user on map load if location not yet loaded
   useEffect(() => {
-    handleFindMyLocation();
+    if (userLocation) {
+      if (mapRef.current) {
+        mapRef.current.setView([userLocation.lat, userLocation.lng], 16);
+      }
+    } else {
+      handleFindMyLocation();
+    }
   }, []);
 
   // Zoom Helpers
@@ -265,114 +261,60 @@ export const ConsumerMap: React.FC = () => {
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20 items-stretch min-h-[calc(100vh-10rem)]">
-      {/* Left panel: Store Listing */}
-      <div className="lg:col-span-5 space-y-4 flex flex-col justify-between max-h-[620px] overflow-y-auto pr-1">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-200/60 pb-2.5">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center">
-              <Navigation className="w-4 h-4 text-mint-500 mr-1.5" />
-              내 주변 할인 매장 목록
+    <div className="space-y-5 pb-20 min-h-[calc(100vh-10rem)]">
+      {/* Top Action Bar: Address Indicator & Fullscreen toggle */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-200/60 shadow-xs">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-mint-50 text-mint-600 rounded-2xl flex items-center justify-center font-bold shrink-0">
+            📍
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">현재 매칭 기준지</span>
+            <h3 className="text-xs font-bold text-slate-800 truncate">
+              {userAddress}
             </h3>
-            <span className="text-[10px] text-slate-400 font-extrabold bg-slate-100 px-2 py-0.5 rounded-full">
-              {userLocation ? 'GPS 거리 순 정렬' : '추천 거리 순 정렬'}
-            </span>
           </div>
+        </div>
 
-          <div className="space-y-3">
-            {sortedStores.map((store) => {
-              const { maxDiscount, totalQty } = getStoreStats(store.id);
-              const isSelected = selectedStore?.id === store.id;
-              
-              // Calculate actual distance if user's location is active, fallback to database static estimate
-              const displayDistance = userLocation 
-                ? getDistanceInMeters(userLocation.lat, userLocation.lng, store.lat, store.lng) 
-                : store.distance;
-
-              return (
-                <div
-                  key={store.id}
-                  onClick={() => {
-                    setSelectedStore(store);
-                    setSelectedProduct(null);
-                  }}
-                  className={`bg-white rounded-2xl p-3.5 border transition-all duration-200 cursor-pointer flex space-x-3.5 ${
-                    isSelected
-                      ? 'border-mint-500 ring-2 ring-mint-100 shadow-md transform translate-x-1'
-                      : 'border-slate-200/60 hover:border-slate-300 hover:shadow-2xs'
-                  }`}
-                >
-                  <img
-                    src={store.imageUrl}
-                    alt={store.name}
-                    className="w-16 h-16 object-cover rounded-xl bg-slate-100 shrink-0 border border-slate-100"
-                  />
-                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-bold">
-                          {store.category === 'bakery' ? '베이커리' : store.category === 'cafe' ? '카페' : store.category === 'convenience' ? '편의점' : store.category === 'side' ? '반찬' : '마트'}
-                        </span>
-                        
-                        <span className={`text-[10px] font-bold flex items-center gap-0.5 ${
-                          userLocation 
-                            ? 'text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100' 
-                            : 'text-slate-500'
-                        }`}>
-                          <Footprints className="w-3.5 h-3.5 shrink-0" />
-                          {userLocation ? `GPS ${displayDistance}m` : `${displayDistance}m`}
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-800 truncate mt-1">{store.name}</h4>
-                      <p className="text-[10px] text-slate-400 truncate mt-0.5">{store.address}</p>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-50 mt-1.5">
-                      <div className="flex items-center space-x-1 text-[10px] text-slate-500 font-semibold">
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        <span>{store.rating} ({store.reviewsCount})</span>
-                      </div>
-                      <div className="flex space-x-1.5">
-                        {totalQty > 0 ? (
-                          <>
-                            <span className="text-[9px] bg-red-50 text-red-600 font-extrabold px-1.5 py-0.5 rounded">
-                              최대 {maxDiscount}% 세일
-                            </span>
-                            <span className="text-[9px] bg-mint-50 text-mint-700 font-extrabold px-1.5 py-0.5 rounded">
-                              재고 {totalQty}개
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-[9px] bg-slate-100 text-slate-400 font-semibold px-1.5 py-0.5 rounded">
-                            마감 완판 👏
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div className="flex items-center justify-end gap-2 shrink-0">
+          {/* Real-time Toggler */}
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="flex items-center space-x-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-all"
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="w-4 h-4 text-slate-500" />
+                <span>분할화면 보기 (상점목록 포함)</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-4 h-4 text-slate-500" />
+                <span>전체화면 지도보기</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Right panel: Real Map Canvas */}
-      <div className="lg:col-span-7 flex flex-col justify-between space-y-4">
-        {/* The map container */}
-        <div className="relative flex-1 bg-slate-100 border border-slate-200 rounded-3xl overflow-hidden min-h-[360px] shadow-sm">
-          
+      {/* Main Map Box */}
+      <div className="relative flex flex-col bg-white border border-slate-200/60 rounded-3xl overflow-hidden shadow-xs">
+        {/* Map Canvas with dynamic height */}
+        <div 
+          style={{ height: isFullscreen ? '600px' : '380px' }} 
+          className="relative w-full bg-slate-100 transition-all duration-300 z-10"
+        >
           {/* Leaflet Mount Target */}
           <div ref={mapContainerRef} className="w-full h-full z-10" />
 
           {/* Floating HUD status indicator */}
-          <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-200/80 shadow-lg max-w-xs flex flex-col gap-0.5 pointer-events-auto">
+          <div className="absolute top-4 left-4 z-20 bg-white/95 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-slate-200/80 shadow-lg max-w-xs flex flex-col gap-0.5 pointer-events-auto">
             <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">지도 모니터링</span>
             <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${
+              <span className={`w-2.5 h-2.5 rounded-full ${
                 locationStatus === 'active' ? 'bg-blue-500 animate-pulse' : isLocating ? 'bg-amber-400 animate-ping' : 'bg-mint-500'
               }`} />
-              <span className="text-xs text-slate-800 font-bold">
+              <span className="text-xs text-slate-800 font-extrabold">
                 {isLocating ? 'GPS 위치 수신 중...' : locationStatus === 'active' ? 'GPS 실시간 현위치 연동됨' : '마포구 창전동 일대 매칭'}
               </span>
             </div>
@@ -422,71 +364,166 @@ export const ConsumerMap: React.FC = () => {
           </div>
         </div>
 
-        {/* Selected Store Tray */}
-        <AnimatePresence mode="wait">
-          {selectedStore && (
-            <motion.div
-              key={selectedStore.id}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              className="bg-white rounded-3xl border border-slate-200/60 p-4.5 space-y-4 shadow-xs"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="text-sm font-extrabold text-slate-800">{selectedStore.name}</h4>
-                  <p className="text-[10px] text-slate-500 flex items-center mt-1">
-                    <Clock className="w-3 h-3 text-slate-400 mr-1" />
-                    수령 보관소 운영시간: 08:00 ~ 22:30 (수령 마감 {selectedStore.id === 'store-1' ? '21:00' : '22:00'})
-                  </p>
-                </div>
-                <button
-                  onClick={() => toggleSubscribeStore(selectedStore.id)}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all duration-200 ${
-                    selectedStore.isSubscribed
-                      ? 'bg-mint-50 text-mint-700 border-mint-200'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  {selectedStore.isSubscribed ? '★ 단골 구독중' : '☆ 단골 매장 등록'}
-                </button>
-              </div>
+        {/* Bottom 1/3: Nearby Stores horizontal list (collapsed when fullscreen) */}
+        {!isFullscreen && (
+          <div className="border-t border-slate-200/60 bg-slate-50/50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 flex items-center">
+                <Navigation className="w-4 h-4 text-mint-500 mr-1.5 shrink-0" />
+                내 주변 마감할인 상점 ({sortedStores.length}곳)
+              </h4>
+              <span className="text-[10px] text-slate-400 font-extrabold bg-white px-2 py-0.5 rounded-full border border-slate-100/80 shadow-3xs">
+                {userLocation ? 'GPS 거리 순 정렬' : '추천 거리 순 정렬'}
+              </span>
+            </div>
 
-              {/* Show items of selected store */}
-              <div className="space-y-2.5">
-                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">이 매장의 마감할인 식품</h5>
-                {getStoreProducts(selectedStore.id).length === 0 ? (
-                  <div className="p-4 bg-slate-50 rounded-2xl text-center text-xs text-slate-400 font-medium">
-                    🙌 현재 이 매장의 할인 식품이 완판되었습니다! 다음 타임 세일을 기다려주세요.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {getStoreProducts(selectedStore.id).map((prod) => (
-                      <div
-                        key={prod.id}
-                        onClick={() => handleOpenReserve(prod)}
-                        className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer flex items-center justify-between transition-colors"
-                      >
-                        <div className="flex items-center space-x-2.5 min-w-0">
-                          <img src={prod.imageUrl} alt={prod.name} className="w-11 h-11 object-cover rounded-lg shrink-0 bg-white border border-slate-100" />
-                          <div className="min-w-0">
-                            <h6 className="text-[11px] font-bold text-slate-800 truncate">{prod.name}</h6>
-                            <p className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">{prod.discountPrice.toLocaleString()}원</p>
-                          </div>
+            {/* Horizontal Scrollable Store Cards Tray */}
+            <div className="flex space-x-3.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+              {sortedStores.map((store) => {
+                const { maxDiscount, totalQty } = getStoreStats(store.id);
+                const isSelected = selectedStore?.id === store.id;
+                
+                // Calculate actual distance if user's location is active, fallback to database static estimate
+                const displayDistance = userLocation 
+                  ? getDistanceInMeters(userLocation.lat, userLocation.lng, store.lat, store.lng) 
+                  : store.distance;
+
+                return (
+                  <div
+                    key={store.id}
+                    onClick={() => {
+                      setSelectedStore(store);
+                      setSelectedProduct(null);
+                      if (mapRef.current) {
+                        mapRef.current.flyTo([store.lat, store.lng], 16, { duration: 1.0 });
+                      }
+                    }}
+                    className={`min-w-[280px] max-w-[320px] bg-white rounded-2xl p-3.5 border transition-all duration-200 cursor-pointer flex space-x-3.5 shrink-0 ${
+                      isSelected
+                        ? 'border-mint-500 ring-2 ring-mint-100 shadow-md transform -translate-y-0.5'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-2xs'
+                    }`}
+                  >
+                    <img
+                      src={store.imageUrl}
+                      alt={store.name}
+                      className="w-16 h-16 object-cover rounded-xl bg-slate-100 shrink-0 border border-slate-100"
+                    />
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-bold">
+                            {store.category === 'bakery' ? '베이커리' : store.category === 'cafe' ? '카페' : store.category === 'convenience' ? '편의점' : store.category === 'side' ? '반찬' : '마트'}
+                          </span>
+                          
+                          <span className={`text-[10px] font-bold flex items-center gap-0.5 ${
+                            userLocation 
+                              ? 'text-blue-600' 
+                              : 'text-slate-500'
+                          }`}>
+                            <Footprints className="w-3.5 h-3.5 shrink-0" />
+                            {displayDistance}m
+                          </span>
                         </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-[10px] text-orange-600 font-extrabold block leading-none">{prod.discountRate}% OFF</span>
-                          <span className="text-[9px] text-slate-500 font-semibold block mt-1">남은재고 {prod.quantity}개</span>
+                        <h4 className="text-xs font-bold text-slate-800 truncate mt-1">{store.name}</h4>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{store.address}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-50 mt-1.5">
+                        <div className="flex items-center space-x-1 text-[10px] text-slate-500 font-semibold">
+                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                          <span>{store.rating} ({store.reviewsCount})</span>
+                        </div>
+                        <div className="flex space-x-1.5">
+                          {totalQty > 0 ? (
+                            <>
+                              <span className="text-[9px] bg-red-50 text-red-600 font-extrabold px-1.5 py-0.5 rounded">
+                                {maxDiscount}%
+                              </span>
+                              <span className="text-[9px] bg-mint-50 text-mint-700 font-extrabold px-1.5 py-0.5 rounded">
+                                {totalQty}개
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[9px] bg-slate-100 text-slate-400 font-semibold px-1.5 py-0.5 rounded">
+                              마감 완판 👏
+                            </span>
+                          )}
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Selected Store Tray: Shows items of selected store */}
+      <AnimatePresence mode="wait">
+        {selectedStore && (
+          <motion.div
+            key={selectedStore.id}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            className="bg-white rounded-3xl border border-slate-200/60 p-4.5 space-y-4 shadow-xs"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-800">{selectedStore.name}</h4>
+                <p className="text-[10px] text-slate-500 flex items-center mt-1">
+                  <Clock className="w-3 h-3 text-slate-400 mr-1" />
+                  수령 보관소 운영시간: 08:00 ~ 22:30 (수령 마감 {selectedStore.id === 'store-1' ? '21:00' : '22:00'})
+                </p>
+              </div>
+              <button
+                onClick={() => toggleSubscribeStore(selectedStore.id)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all duration-200 ${
+                  selectedStore.isSubscribed
+                    ? 'bg-mint-50 text-mint-700 border-mint-200'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {selectedStore.isSubscribed ? '★ 단골 구독중' : '☆ 단골 매장 등록'}
+              </button>
+            </div>
+
+            {/* Show items of selected store */}
+            <div className="space-y-2.5">
+              <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">이 매장의 마감할인 식품</h5>
+              {getStoreProducts(selectedStore.id).length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-2xl text-center text-xs text-slate-400 font-medium">
+                  🙌 현재 이 매장의 할인 식품이 완판되었습니다! 다음 타임 세일을 기다려주세요.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {getStoreProducts(selectedStore.id).map((prod) => (
+                    <div
+                      key={prod.id}
+                      onClick={() => handleOpenReserve(prod)}
+                      className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer flex items-center justify-between transition-colors"
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <img src={prod.imageUrl} alt={prod.name} className="w-11 h-11 object-cover rounded-lg shrink-0 bg-white border border-slate-100" />
+                        <div className="min-w-0">
+                          <h6 className="text-[11px] font-bold text-slate-800 truncate">{prod.name}</h6>
+                          <p className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">{prod.discountPrice.toLocaleString()}원</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-orange-600 font-extrabold block leading-none">{prod.discountRate}% OFF</span>
+                        <span className="text-[9px] text-slate-500 font-semibold block mt-1">남은재고 {prod.quantity}개</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Embedded Reserve Dialog */}
       <AnimatePresence>

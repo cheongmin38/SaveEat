@@ -20,6 +20,10 @@ interface AppContextType {
   setUserLocation: (loc: { lat: number; lng: number } | null) => void;
   userAddress: string;
   setUserAddress: (addr: string) => void;
+  isLocating: boolean;
+  locationStatus: 'idle' | 'active' | 'error';
+  locationErrorMessage: string | null;
+  findMyLocation: (onSuccess?: (lat: number, lng: number) => void) => void;
   
   // Data State
   stores: Store[];
@@ -243,6 +247,115 @@ const INITIAL_PRODUCTS: Product[] = [
   }
 ];
 
+const PRODUCT_TEMPLATES = {
+  bakery: [
+    {
+      name: '단팥빵 & 소보루 패키지',
+      originalPrice: 6500,
+      imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍞 {storeName}에서 오늘 갓 구운 단팥빵과 달콤 바삭한 소보루의 만남! 퇴근길 알뜰하게 픽업하세요.'
+    },
+    {
+      name: '우유식빵 & 딸기잼 세트',
+      originalPrice: 8500,
+      imageUrl: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍞 부드러운 유기농 우유식빵! {storeName}에서 버려지는 빵 대신 내 저녁 가치소비로 맛있는 샌드위치를 만들어보세요.'
+    },
+    {
+      name: '모카 크림빵 패키지',
+      originalPrice: 7500,
+      imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=60',
+      aiHook: '☕ 은은한 모카향과 부드러운 생크림이 한가득! {storeName}에서 마감 할인 찬스로 저렴하게 즐겨요.'
+    },
+    {
+      name: '마카롱 5구 구출 세트',
+      originalPrice: 15000,
+      imageUrl: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍬 알록달록 입안에서 사르르 녹는 달콤 쫀득한 수제 마카롱! 지구도 구하고 기분도 전환하는 완벽한 디저트!'
+    }
+  ],
+  convenience: [
+    {
+      name: '매콤제육 도시락 & 컵라면 세트',
+      originalPrice: 6500,
+      imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍱 든든한 한 끼! {storeName}의 유통기한 임박 제육도시락에 얼큰한 라면까지 단돈 2천원대에 구출하세요!'
+    },
+    {
+      name: '참치마요 & 삼각김밥 패키지',
+      originalPrice: 4200,
+      imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍙 바쁜 일상의 든든한 동반자! 고소한 참치마요를 {storeName} 특가로 구출하여 간편하게 영양 보충하세요.'
+    },
+    {
+      name: '훈제란 3구 & 아몬드 밀크',
+      originalPrice: 5000,
+      imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🥚 운동 후 깔끔한 단백질 보충! 유통기한이 조금 임박했을 뿐 영양은 그대로 100% 살아있습니다.'
+    }
+  ],
+  cafe: [
+    {
+      name: '아메리카노 & 치즈케이크 세트',
+      originalPrice: 11000,
+      imageUrl: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍰 {storeName}의 깊고 묵직한 아메리카노와 꾸덕꾸덕 고소한 수제 뉴욕 치즈케이크 세트가 마감 초특가!'
+    },
+    {
+      name: '크로플 & 바닐라라떼 세트',
+      originalPrice: 10500,
+      imageUrl: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🥐 달콤한 메이플 시럽을 얹은 크로플에 달달한 바닐라라떼 한 잔! 하루의 피로가 녹아내리는 힐링 타임.'
+    },
+    {
+      name: '클럽 샌드위치 & 수제 에이드',
+      originalPrice: 12500,
+      imageUrl: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🥪 신선한 야채와 햄, 치즈가 꽉 찬 {storeName} 영양 샌드위치! 오늘 폐기를 저지하고 건강하게 가치소비하세요.'
+    }
+  ],
+  side: [
+    {
+      name: '수제 제육볶음 반조리 (3인분)',
+      originalPrice: 16000,
+      imageUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍳 매콤 달콤하게 양념해 입에 척 붙는 {storeName} 비법 제육볶음! 온 가족 저녁 메인 반찬으로 완벽 구출.'
+    },
+    {
+      name: '동네 정성 모듬나물 5종 세트',
+      originalPrice: 9500,
+      imageUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🥗 시금치, 고사리, 콩나물 등으로 구성된 건강 나물 반찬! 밥 위에 계란프라이와 비벼 먹으면 꿀맛 비빔밥 완성!'
+    },
+    {
+      name: '집밥 된장찌개 밀키트 & 장조림 세트',
+      originalPrice: 13000,
+      imageUrl: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍲 {storeName} 이모님이 직접 끓인 구수하고 칼칼한 우렁된장찌개와 짭조름 밥도둑 소고기 장조림!'
+    }
+  ],
+  mart: [
+    {
+      name: '당도보장 설향 딸기 한 팩 (500g)',
+      originalPrice: 13000,
+      imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍓 빨갛게 잘 익은 과즙 폭발 설향 딸기! 산지 직송되어 영양이 뛰어나며, 오늘 마감 세일가로 당장 낚아채세요.'
+    },
+    {
+      name: '친환경 모듬 쌈채소 버라이어티 팩',
+      originalPrice: 4800,
+      imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🥬 상추, 깻잎, 치커리 등 무농약 신선 채소 한가득! 고기 파티할 때 가계 부담 없이 안심하고 구출해요.'
+    },
+    {
+      name: 'GAP 세척사과 한 봉 (5과입)',
+      originalPrice: 11000,
+      imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=60',
+      aiHook: '🍎 껍질째 먹을 수 있어 더 건강한 국내산 부사 세척사과! 매일 아침 황금 사과 한 알로 건강한 일상을 챙기세요.'
+    }
+  ]
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Navigation / Roles
   const [currentRole, setCurrentRole] = useState<'consumer' | 'seller'>(() => {
@@ -251,61 +364,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [consumerTab, setConsumerTab] = useState<'home' | 'map' | 'favorites' | 'orders' | 'mypage'>('home');
   const [sellerTab, setSellerTab] = useState<'dashboard' | 'register' | 'orders' | 'stats' | 'settings'>('dashboard');
-
-  // Geolocation States and Effects
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [userAddress, setUserAddress] = useState<string>('서울시 마포구 창전동 주변 📍');
-
-  // Reverse Geocoding with OSM Nominatim API
-  useEffect(() => {
-    if (!userLocation) return;
-    
-    const reverseGeocode = async () => {
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json&accept-language=ko`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          const addressObj = data.address;
-          if (addressObj) {
-            const city = addressObj.province || addressObj.city || addressObj.metro_division || '';
-            const borough = addressObj.borough || addressObj.suburb || addressObj.city_district || addressObj.district || '';
-            const road = addressObj.road || addressObj.neighbourhood || addressObj.village || '';
-            const niceAddress = `${city} ${borough} ${road}`.trim().replace(/\s+/g, ' ');
-            if (niceAddress) {
-              setUserAddress(niceAddress + ' 📍');
-              return;
-            }
-          }
-          if (data.display_name) {
-            const shortened = data.display_name.split(',').slice(0, 3).reverse().join(' ').trim();
-            setUserAddress(shortened + ' 📍');
-          }
-        }
-      } catch (err) {
-        console.error('Reverse geocoding failed:', err);
-      }
-    };
-
-    reverseGeocode();
-  }, [userLocation]);
-
-  // Auto Geolocate on app load
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
-        },
-        (error) => {
-          console.warn('Initial geolocation permission or signal failed:', error);
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    }
-  }, []);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -321,6 +379,349 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('lastpick_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
+
+  // Geolocation States
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userAddress, setUserAddress] = useState<string>('서울시 마포구 창전동 주변 📍');
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'active' | 'error'>('idle');
+  const [locationErrorMessage, setLocationErrorMessage] = useState<string | null>(null);
+
+  // Fallback Store Synthesis (generates perfectly localized authentic-looking shops)
+  const generateFallbackStores = (lat: number, lng: number, localName: string) => {
+    const categories: ('bakery' | 'convenience' | 'cafe' | 'side' | 'mart')[] = [
+      'bakery', 'convenience', 'cafe', 'side', 'mart'
+    ];
+
+    const brandNames = {
+      bakery: ['파리바게뜨', '뚜레쥬르', '아티제', '밀밭 베이커리', '브레드하우스'],
+      convenience: ['CU', 'GS25', '세븐일레븐', '이마트24'],
+      cafe: ['스타벅스', '메가커피', '이디야커피', '컴포즈커피', '투썸플레이스'],
+      side: ['찬장가득 반찬가게', '진이찬방', '국선생', '소문난 반찬', '행복한 찬방'],
+      mart: ['이마트 에브리데이', '홈플러스 익스프레스', 'GS더프레시', '우리 동네 마트'],
+    };
+
+    const categoryImages = {
+      bakery: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=60',
+      convenience: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=60',
+      cafe: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&auto=format&fit=crop&q=60',
+      side: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&auto=format&fit=crop&q=60',
+      mart: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=60',
+    };
+
+    const categoryDescriptions = {
+      bakery: '당일 구워진 향긋하고 신선한 유기농 베이커리 마감할인 구출 작전!',
+      convenience: '당일 마감 삼각김밥, 샌드위치, 도시락 등 초특가 기회!',
+      cafe: '스페셜티 카페의 당일 한정 수제 디저트와 향긋한 베이커리 구출!',
+      side: '엄마 손맛 반찬과 고품격 델리 요리를 반값에 즐기는 한 끼 구출!',
+      mart: '신선한 청과물과 고품질 신선 마트 특가 상품 구출!',
+    };
+
+    const processedStores: Store[] = categories.map((cat, index) => {
+      // Add small random offset around user location (within 500m)
+      const latOffset = (Math.random() - 0.5) * 0.007;
+      const lngOffset = (Math.random() - 0.5) * 0.007;
+      const elLat = lat + latOffset;
+      const elLng = lng + lngOffset;
+      
+      const brands = brandNames[cat];
+      const brand = brands[Math.floor(Math.random() * brands.length)];
+      const name = `${brand} ${localName || '우리동네'}점`;
+
+      const distance = Math.round(
+        Math.sqrt(Math.pow(latOffset * 111000, 2) + Math.pow(lngOffset * 88000, 2))
+      );
+
+      return {
+        id: `fallback-store-${cat}-${index}`,
+        name: name,
+        category: cat,
+        address: `서울시 ${localName || '마포구'} 인근 대로변 1층`,
+        lat: elLat,
+        lng: elLng,
+        rating: parseFloat((4.2 + Math.random() * 0.7).toFixed(1)),
+        reviewsCount: Math.floor(10 + Math.random() * 150),
+        distance: distance,
+        isSubscribed: Math.random() > 0.5,
+        isOpen: true,
+        imageUrl: categoryImages[cat],
+        description: categoryDescriptions[cat]
+      };
+    }).sort((a, b) => a.distance - b.distance);
+
+    const generatedProducts: Product[] = [];
+    processedStores.forEach((store) => {
+      const numProds = Math.floor(Math.random() * 2) + 1;
+      const prodTemplates = PRODUCT_TEMPLATES[store.category] || [];
+      const shuffledTemplates = [...prodTemplates].sort(() => 0.5 - Math.random());
+      
+      for (let i = 0; i < Math.min(numProds, shuffledTemplates.length); i++) {
+        const temp = shuffledTemplates[i];
+        const discountRate = Math.floor(35 + Math.random() * 30);
+        const discountPrice = Math.floor((temp.originalPrice * (100 - discountRate)) / 100 / 100) * 100;
+        const actDiscountRate = Math.round(((temp.originalPrice - discountPrice) / temp.originalPrice) * 100);
+
+        generatedProducts.push({
+          id: `fallback-prod-${store.id}-${i}`,
+          storeId: store.id,
+          storeName: store.name,
+          name: temp.name,
+          originalPrice: temp.originalPrice,
+          discountPrice: discountPrice,
+          discountRate: actDiscountRate,
+          quantity: Math.floor(Math.random() * 5) + 1,
+          expiryDate: `오늘 ${18 + Math.floor(Math.random() * 5)}:${Math.random() > 0.5 ? '00' : '30'} 마감`,
+          pickupTime: '18:00 ~ 22:00',
+          category: store.category,
+          imageUrl: temp.imageUrl,
+          aiProbability: Math.floor(75 + Math.random() * 23),
+          aiRisk: Math.random() > 0.5 ? 'HIGH' : 'MEDIUM',
+          aiHook: temp.aiHook.replace('{storeName}', store.name)
+        });
+      }
+    });
+
+    setStores(processedStores);
+    setProducts(generatedProducts);
+    localStorage.setItem('lastpick_stores', JSON.stringify(processedStores));
+    localStorage.setItem('lastpick_products', JSON.stringify(generatedProducts));
+  };
+
+  // Real-time OSM Overpass API Store Fetcher
+  const loadRealStoresAndProducts = async (lat: number, lng: number, localName: string) => {
+    try {
+      // Look for suitable food/beverage shops & amenities within 1200m
+      const query = `
+        [out:json][timeout:15];
+        (
+          node["shop"~"supermarket|bakery|convenience|deli|confectionery|pastry|grocery"](around:1200, ${lat}, ${lng});
+          way["shop"~"supermarket|bakery|convenience|deli|confectionery|pastry|grocery"](around:1200, ${lat}, ${lng});
+          node["amenity"~"cafe|restaurant|fast_food"](around:1200, ${lat}, ${lng});
+          way["amenity"~"cafe|restaurant|fast_food"](around:1200, ${lat}, ${lng});
+        );
+        out center;
+      `;
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Overpass API not responding');
+      
+      const data = await response.json();
+      const elements = data.elements || [];
+      
+      // Filter elements with valid names & locations
+      const validElements = elements.filter((el: any) => {
+        const name = el.tags?.name;
+        const elLat = el.lat || el.center?.lat;
+        const elLng = el.lon || el.center?.lon;
+        return name && elLat && elLng;
+      });
+
+      if (validElements.length === 0) {
+        throw new Error('No named food shops found in OSM near coordinates');
+      }
+
+      const categoryMapping = (tags: any): 'bakery' | 'convenience' | 'cafe' | 'side' | 'mart' => {
+        const shop = tags.shop || '';
+        const amenity = tags.amenity || '';
+        
+        if (shop === 'bakery' || shop === 'confectionery' || shop === 'pastry') return 'bakery';
+        if (shop === 'convenience') return 'convenience';
+        if (amenity === 'cafe') return 'cafe';
+        if (shop === 'supermarket' || shop === 'grocery') return 'mart';
+        return 'side';
+      };
+
+      const categoryImages = {
+        bakery: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=60',
+        convenience: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=60',
+        cafe: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&auto=format&fit=crop&q=60',
+        side: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&auto=format&fit=crop&q=60',
+        mart: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=60',
+      };
+
+      const categoryDescriptions = {
+        bakery: '당일 구워진 향긋하고 신선한 유기농 베이커리 마감할인 구출 작전!',
+        convenience: '당일 마감 삼각김밥, 샌드위치, 도시락 등 초특가 기회!',
+        cafe: '스페셜티 카페의 당일 한정 수제 디저트와 향긋한 베이커리 구출!',
+        side: '엄마 손맛 반찬과 고품격 델리 요리를 반값에 즐기는 한 끼 구출!',
+        mart: '신선한 청과물과 고품질 신선 마트 특가 상품 구출!',
+      };
+
+      const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371e3;
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lon2-lon1) * Math.PI/180;
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return Math.round(R * c);
+      };
+
+      // Transform top 8 closest real elements
+      const processedStores: Store[] = validElements
+        .map((el: any, index: number) => {
+          const elLat = el.lat || el.center?.lat;
+          const elLng = el.lon || el.center?.lon;
+          const name = el.tags?.name || '동네 상점';
+          const category = categoryMapping(el.tags);
+          const distance = getDistance(lat, lng, elLat, elLng);
+          
+          return {
+            id: `real-store-${el.id || index}`,
+            name: name,
+            category: category,
+            address: el.tags['addr:full'] || el.tags['addr:street'] || `${localName} 주변`,
+            lat: elLat,
+            lng: elLng,
+            rating: parseFloat((4.3 + Math.random() * 0.6).toFixed(1)),
+            reviewsCount: Math.floor(20 + Math.random() * 200),
+            distance: distance,
+            isSubscribed: Math.random() > 0.6,
+            isOpen: true,
+            imageUrl: categoryImages[category],
+            description: categoryDescriptions[category]
+          };
+        })
+        .sort((a: Store, b: Store) => a.distance - b.distance)
+        .slice(0, 10);
+
+      const generatedProducts: Product[] = [];
+      processedStores.forEach((store) => {
+        const numProds = Math.floor(Math.random() * 2) + 1;
+        const prodTemplates = PRODUCT_TEMPLATES[store.category] || [];
+        const shuffledTemplates = [...prodTemplates].sort(() => 0.5 - Math.random());
+        
+        for (let i = 0; i < Math.min(numProds, shuffledTemplates.length); i++) {
+          const temp = shuffledTemplates[i];
+          const discountRate = Math.floor(35 + Math.random() * 30);
+          const discountPrice = Math.floor((temp.originalPrice * (100 - discountRate)) / 100 / 100) * 100;
+          const actDiscountRate = Math.round(((temp.originalPrice - discountPrice) / temp.originalPrice) * 100);
+
+          generatedProducts.push({
+            id: `real-prod-${store.id}-${i}`,
+            storeId: store.id,
+            storeName: store.name,
+            name: temp.name,
+            originalPrice: temp.originalPrice,
+            discountPrice: discountPrice,
+            discountRate: actDiscountRate,
+            quantity: Math.floor(Math.random() * 5) + 1,
+            expiryDate: `오늘 ${18 + Math.floor(Math.random() * 5)}:${Math.random() > 0.5 ? '00' : '30'} 마감`,
+            pickupTime: '18:00 ~ 22:00',
+            category: store.category,
+            imageUrl: temp.imageUrl,
+            aiProbability: Math.floor(75 + Math.random() * 23),
+            aiRisk: Math.random() > 0.5 ? 'HIGH' : 'MEDIUM',
+            aiHook: temp.aiHook.replace('{storeName}', store.name)
+          });
+        }
+      });
+
+      setStores(processedStores);
+      setProducts(generatedProducts);
+      localStorage.setItem('lastpick_stores', JSON.stringify(processedStores));
+      localStorage.setItem('lastpick_products', JSON.stringify(generatedProducts));
+
+    } catch (err) {
+      console.warn('Real OSM Overpass query failed or returned no results. Falling back to localized synthesis:', err);
+      generateFallbackStores(lat, lng, localName);
+    }
+  };
+
+  // Reverse Geocoding with OSM Nominatim API
+  useEffect(() => {
+    if (!userLocation) return;
+    
+    const reverseGeocode = async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json&accept-language=ko`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const addressObj = data.address;
+          let localName = '우리동네';
+
+          if (addressObj) {
+            const city = addressObj.province || addressObj.city || addressObj.metro_division || '';
+            const borough = addressObj.borough || addressObj.suburb || addressObj.city_district || addressObj.district || '';
+            const road = addressObj.road || addressObj.neighbourhood || addressObj.village || '';
+            const niceAddress = `${city} ${borough} ${road}`.trim().replace(/\s+/g, ' ');
+
+            const possibleLocal = addressObj.suburb || addressObj.neighbourhood || addressObj.village || addressObj.borough || addressObj.city_district || '';
+            if (possibleLocal) {
+              localName = possibleLocal;
+            } else {
+              const match = niceAddress.match(/[가-힣]+(동|읍|면|구)/);
+              if (match) {
+                localName = match[0];
+              }
+            }
+
+            if (niceAddress) {
+              setUserAddress(niceAddress + ' 📍');
+              loadRealStoresAndProducts(userLocation.lat, userLocation.lng, localName);
+              return;
+            }
+          }
+          if (data.display_name) {
+            const shortened = data.display_name.split(',').slice(0, 3).reverse().join(' ').trim();
+            setUserAddress(shortened + ' 📍');
+            loadRealStoresAndProducts(userLocation.lat, userLocation.lng, localName);
+          }
+        }
+      } catch (err) {
+        console.error('Reverse geocoding failed:', err);
+      }
+    };
+
+    reverseGeocode();
+  }, [userLocation]);
+
+  const findMyLocation = (onSuccess?: (lat: number, lng: number) => void) => {
+    if (!navigator.geolocation) {
+      setLocationStatus('error');
+      setLocationErrorMessage('이 브라우저에서는 GPS 실시간 위치 조회를 지원하지 않습니다.');
+      return;
+    }
+
+    setIsLocating(true);
+    setLocationErrorMessage(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        setLocationStatus('active');
+        setIsLocating(false);
+        if (onSuccess) {
+          onSuccess(latitude, longitude);
+        }
+      },
+      (error) => {
+        console.warn('GPS position error or permission denied:', error);
+        setIsLocating(false);
+        setLocationStatus('error');
+        // Let user know fallback is used
+        setLocationErrorMessage('위치 권한이 없거나 신호가 약해 서울 마포구 창전동(신촌) 기준으로 설정합니다.');
+        // Set initial fallback coordinates if no location has been obtained yet
+        const defaultLat = 37.5512;
+        const defaultLng = 126.9324;
+        setUserLocation({ lat: defaultLat, lng: defaultLng });
+        loadRealStoresAndProducts(defaultLat, defaultLng, '창전동');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  // Auto Geolocate on app load
+  useEffect(() => {
+    findMyLocation();
+  }, []);
 
   const [orders, setOrders] = useState<Order[]>(() => {
     const saved = localStorage.getItem('lastpick_orders');
@@ -656,6 +1057,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserLocation,
         userAddress,
         setUserAddress,
+        isLocating,
+        locationStatus,
+        locationErrorMessage,
+        findMyLocation,
         
         stores,
         products,
